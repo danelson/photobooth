@@ -9,9 +9,6 @@ import optparse
 import numpy
 import scipy.ndimage
 
-import imgutil
-
-
 class PhotoBooth(object):
     def __init__(self, source=0):
         '''
@@ -27,45 +24,45 @@ class PhotoBooth(object):
                 "c":self.gradient_magnitude, "u":self.unsharp_mask,
                 "f":self.frame_differencing}
                         
-        self.activeEffects = [] #array holding active effects
-        self.numPyArray = None #the current array
-        self.lastArray = None #the array from the previous frame
+        self.active_effects = [] #array holding active effects
+        self.frame = None #the current array
+        self.last_array = None #the array from the previous frame
         
-        self.rotDegree = 0
-        self.gradientSigma = 0
-        self.gaussianSigma = 0		
+        self.rotation_degree = 0
+        self.gradient_sigma = 0
+        self.gaussian_sigma = 0		
 
     def negate(self):
         '''
         Negates the image.
         '''
-        new = numpy.ones_like(self.numPyArray)
+        new = numpy.ones_like(self.frame)
         new = new*255
-        negative = new - self.numPyArray
-        self.numPyArray = negative
+        negative = new - self.frame
+        self.frame = negative
     
     def grayscale(self):
         '''
         Takes the grayscale of the image.
         '''
-        self.numPyArray.astype(float)
+        self.frame.astype(float)
         #for each color channel
         for i in range(3):
-            self.numPyArray[:,:,i] = self.numPyArray[:,:,0]*0.3 + \
-                                    self.numPyArray[:,:,1]*0.59 + \
-                                    self.numPyArray[:,:,2]*0.11
+            self.frame[:,:,i] = self.frame[:,:,0]*0.3 + \
+                                    self.frame[:,:,1]*0.59 + \
+                                    self.frame[:,:,2]*0.11
 
     def flip_vertical(self):
         '''
         Flips the array over the vertical axis.
         '''
-        self.numPyArray = numpy.fliplr(self.numPyArray)
+        self.frame = numpy.fliplr(self.frame)
         
     def flip_horizontal(self):
         '''
         Flips the array over the horizontal axis.
         '''
-        self.numPyArray = numpy.flipud(self.numPyArray)
+        self.frame = numpy.flipud(self.frame)
     
 
     def gaussian(self):
@@ -73,12 +70,12 @@ class PhotoBooth(object):
         Applies gaussian blur to the image. Takes a parameter from the
         command line.
         '''
-        if self.gaussianSigma == 0:
-            self.gaussianSigma = int(raw_input("Input gaussian sigma: "))
+        if self.gaussian_sigma == 0:
+            self.gaussian_sigma = int(raw_input("Input gaussian sigma: "))
         for i in range(3):
-            scipy.ndimage.filters.gaussian_filter(self.numPyArray[:,:,i],
-                                                self.gaussianSigma,
-                                                output=self.numPyArray[:,:,i])
+            scipy.ndimage.filters.gaussian_filter(self.frame[:,:,i],
+                                                self.gaussian_sigma,
+                                                output=self.frame[:,:,i])
     
 
     def gradient_magnitude(self):
@@ -86,21 +83,21 @@ class PhotoBooth(object):
         Applies the gradient magnitude to the image. Takes a parameter
         from the command line
         '''
-        if self.gradientSigma == 0:
-            self.gradientSigma = int(raw_input("Input gradeint sigma: "))
+        if self.gradient_sigma == 0:
+            self.gradient_sigma = int(raw_input("Input gradeint sigma: "))
         for i in range(3):
-            scipy.ndimage.filters.gaussian_gradient_magnitude(self.numPyArray[:,:,i],
-                                                        self.gradientSigma,
-                                                        output=self.numPyArray[:,:,i])
+            scipy.ndimage.filters.gaussian_gradient_magnitude(self.frame[:,:,i],
+                                                        self.gradient_sigma,
+                                                        output=self.frame[:,:,i])
 
     def mirror(self):
         '''
         Mirrors the image vertically along the midpoint.
         '''
-        numCols = self.numPyArray.shape[1]
-        half = self.numPyArray[:,:numCols/2,:]
+        numCols = self.frame.shape[1]
+        half = self.frame[:,:numCols/2,:]
         halfFlip = numpy.fliplr(half)
-        self.numPyArray[:,numCols/2:,:] = halfFlip
+        self.frame[:,numCols/2:,:] = halfFlip
     
     
     def unsharp_mask(self):
@@ -108,22 +105,22 @@ class PhotoBooth(object):
         Sharpens the image. Takes a command line parameter for the
         gaussian sigma value.
         '''
-        original = self.numPyArray.copy()
-        self.gaussian() #makes self.numPyArray blurry
-        highPass = original - self.numPyArray
-        self.numPyArray = highPass*3 + original
+        original = self.frame.copy()
+        self.gaussian() #makes self.frame blurry
+        highPass = original - self.frame
+        self.frame = highPass*3 + original
         
         #get rid of the noise
-        self.numPyArray[self.numPyArray > 255] = 255
-        self.numPyArray[self.numPyArray < 0] = 0
+        self.frame[self.frame > 255] = 255
+        self.frame[self.frame < 0] = 0
 
     def laplace(self):
         '''  
         Applies laplace filter to the image.
         '''
         for i in range(3):
-            scipy.ndimage.filters.laplace(self.numPyArray[:,:,i],
-                                            output=self.numPyArray[:,:,i])
+            scipy.ndimage.filters.laplace(self.frame[:,:,i],
+                                            output=self.frame[:,:,i])
     
 
     def rotate(self):
@@ -131,59 +128,59 @@ class PhotoBooth(object):
         Rotates the image. Takes a command line parameter for the
         rotation degree.
         '''
-        if self.rotDegree == 0:
-            self.rotDegree = int(raw_input("Input rotation degree: "))
-        scipy.ndimage.interpolation.rotate(self.numPyArray, self.rotDegree,
-                                        reshape=False,output=self.numPyArray)
+        if self.rotation_degree == 0:
+            self.rotation_degree = int(raw_input("Input rotation degree: "))
+        scipy.ndimage.interpolation.rotate(self.frame, self.rotation_degree,
+                                        reshape=False,output=self.frame)
 
     def alpha_blend(self):
         '''
         Blends the image with the previous frame.
         '''
-        self.numPyArray = self.numPyArray*0.1 + (1-0.1)*self.lastArray
+        self.frame = self.frame*0.1 + (1-0.1)*self.last_array
     
     def frame_differencing(self):
         '''
         Applies frame differencing to the image.
         '''
-        self.numPyArray = self.numPyArray - self.lastArrayA
+        self.frame = self.frame - self.lastArrayA
         
         #correct for webcam error
-        #self.numPyArray[self.numPyArray < 10] = 0
+        #self.frame[self.frame < 10] = 0
     
     def apply_effects(self):
         '''
         Applies the active effects.
         '''
-        for x in self.activeEffects:
+        for x in self.active_effects:
             self.effects.get(x)()
     
     def print_active_effects(self):
         '''
         Prints the active effects.
         '''
-        if len(self.activeEffects) == 0:
+        if len(self.active_effects) == 0:
             print "No active effects"
         else:
-            print "Active effects: ", self.activeEffects
+            print "Active effects: ", self.active_effects
 
     def add_effects(self,char):
         '''
         Adds effects to the holder array.
         '''
-        self.activeEffects.append(char)
+        self.active_effects.append(char)
     
     def remove_effects(self,char):
         '''
         Removes effects from the holder array.
         '''
-        self.activeEffects.remove(char)
+        self.active_effects.remove(char)
         if char == "r":
-            self.rotDegree = 0
+            self.rotation_degree = 0
         elif char == "c":
-            self.gradientSigma = 0
+            self.gradient_sigma = 0
         elif char =="a":
-            self.gaussianSigma = 0
+            self.gaussian_sigma = 0
     
     
     def run(self):
@@ -207,21 +204,19 @@ class PhotoBooth(object):
         esc
         '''
         key = None
-        imgNum = 0
+        frame_number = 0
+        
         #while the key being pushed isn't the exit button
         while key != 27:
-            frame = self.source.read()[1]
+            self.frame = self.source.read()[1]
             
-            self.numPyArray = frame
-            self.numPyArray = self.numPyArray.astype(numpy.float32)
-
             key = cv2.waitKey(30)
 
-            #check if the key exists
+            # Check if the key exists
             char = chr(key) if key > 0 else None
             if self.effects.has_key(char):
                 #if the effect is not applied, queue to add it
-                if char not in self.activeEffects:
+                if char not in self.active_effects:
                     self.add_effects(char)
                     self.print_active_effects()
                 #if the effect is applied, queue to remove it
@@ -230,19 +225,18 @@ class PhotoBooth(object):
                     self.print_active_effects()
                         
             #apply effects and show the image
-            self.lastArrayB = self.numPyArray
+            self.lastArrayB = self.frame
             self.apply_effects()
-            self.lastArrayA = self.numPyArray # save the this frame as last
-            finalImage = imgutil.normalize(self.numPyArray)
+            self.lastArrayA = self.frame # save the this frame as last
             
             #if the key is the 'save' key
             if char == "s":
-                imgNum += 1
-                name = "img" + str(imgNum) + ".jpg"
-                cv2.imwrite(name,finalImage)
+                frame_number += 1
+                name = "img" + str(frame_number) + ".jpg"
+                cv2.imwrite(name,self.frame)
             
             #show the image with effects active
-            cv2.imshow("PhotoBooth", finalImage)
+            cv2.imshow("PhotoBooth", self.frame)
     
 
 
