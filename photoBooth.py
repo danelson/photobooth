@@ -24,9 +24,9 @@ class PhotoBooth(object):
                 "c":self.gradient_magnitude, "u":self.unsharp_mask,
                 "f":self.frame_differencing}
                         
-        self.active_effects = [] #array holding active effects
-        self.frame = None #the current array
-        self.last_array = None #the array from the previous frame
+        self.active_effects = []
+        self.frame = None
+        self.previous_frame = None
         
         self.rotation_degree = 0
         self.gradient_sigma = 0
@@ -37,20 +37,27 @@ class PhotoBooth(object):
         Negates the image.
         '''
         new = numpy.ones_like(self.frame)
-        new = new*255
+        new = new * 255
         negative = new - self.frame
         self.frame = negative
+    
+    def _grayscale(self, img):
+        '''
+        Takes the grayscale of the image.
+        '''
+        img.astype(float)
+        #for each color channel
+        for i in range(3):
+            img[:,:,i] = img[:,:,0]*0.3 + \
+                            img[:,:,1]*0.59 + \
+                            img[:,:,2]*0.11
+        return img
     
     def grayscale(self):
         '''
         Takes the grayscale of the image.
         '''
-        self.frame.astype(float)
-        #for each color channel
-        for i in range(3):
-            self.frame[:,:,i] = self.frame[:,:,0]*0.3 + \
-                                    self.frame[:,:,1]*0.59 + \
-                                    self.frame[:,:,2]*0.11
+        self.frame = self._grayscale(self.frame)
 
     def flip_vertical(self):
         '''
@@ -64,27 +71,25 @@ class PhotoBooth(object):
         '''
         self.frame = numpy.flipud(self.frame)
     
-
     def gaussian(self):
         '''
         Applies gaussian blur to the image. Takes a parameter from the
         command line.
         '''
         if self.gaussian_sigma == 0:
-            self.gaussian_sigma = int(raw_input("Input gaussian sigma: "))
+            self.gaussian_sigma = int(raw_input("Input Gaussian sigma: "))
         for i in range(3):
             scipy.ndimage.filters.gaussian_filter(self.frame[:,:,i],
                                                 self.gaussian_sigma,
                                                 output=self.frame[:,:,i])
     
-
     def gradient_magnitude(self):
         '''
         Applies the gradient magnitude to the image. Takes a parameter
-        from the command line
+        from the command line.
         '''
         if self.gradient_sigma == 0:
-            self.gradient_sigma = int(raw_input("Input gradeint sigma: "))
+            self.gradient_sigma = int(raw_input("Input gradient sigma: "))
         for i in range(3):
             scipy.ndimage.filters.gaussian_gradient_magnitude(self.frame[:,:,i],
                                                         self.gradient_sigma,
@@ -94,10 +99,10 @@ class PhotoBooth(object):
         '''
         Mirrors the image vertically along the midpoint.
         '''
-        numCols = self.frame.shape[1]
-        half = self.frame[:,:numCols/2,:]
+        num_cols = self.frame.shape[1]
+        half = self.frame[:,:num_cols/2,:]
         halfFlip = numpy.fliplr(half)
-        self.frame[:,numCols/2:,:] = halfFlip
+        self.frame[:,num_cols/2:,:] = halfFlip
     
     
     def unsharp_mask(self):
@@ -106,11 +111,11 @@ class PhotoBooth(object):
         gaussian sigma value.
         '''
         original = self.frame.copy()
-        self.gaussian() #makes self.frame blurry
-        highPass = original - self.frame
-        self.frame = highPass*3 + original
+        self.gaussian()
+        high_pass = original - self.frame
+        self.frame = high_pass*3 + original
         
-        #get rid of the noise
+        # Clip values
         self.frame[self.frame > 255] = 255
         self.frame[self.frame < 0] = 0
 
@@ -118,11 +123,13 @@ class PhotoBooth(object):
         '''  
         Applies laplace filter to the image.
         '''
+        original = numpy.zeros_like(self.frame)
         for i in range(3):
             scipy.ndimage.filters.laplace(self.frame[:,:,i],
-                                            output=self.frame[:,:,i])
-    
-
+                                            output=original[:,:,i])
+        
+        self.frame = original
+        
     def rotate(self):
         '''
         Rotates the image. Takes a command line parameter for the
@@ -130,6 +137,7 @@ class PhotoBooth(object):
         '''
         if self.rotation_degree == 0:
             self.rotation_degree = int(raw_input("Input rotation degree: "))
+            
         scipy.ndimage.interpolation.rotate(self.frame, self.rotation_degree,
                                         reshape=False,output=self.frame)
 
@@ -143,10 +151,8 @@ class PhotoBooth(object):
         '''
         Applies frame differencing to the image.
         '''
-        self.frame = self.frame - self.lastArrayA
-        
-        #correct for webcam error
-        #self.frame[self.frame < 10] = 0
+        ### FIX THIS
+        self.frame = self.normalize(self.frame - self.previous_frame)
     
     def apply_effects(self):
         '''
@@ -182,6 +188,23 @@ class PhotoBooth(object):
         elif char =="a":
             self.gaussian_sigma = 0
     
+    def normalize(self, image, range_=(0,255), dtype=numpy.uint8):
+        '''
+        Linearly remap values in input data into range (0-255, by default).  
+        Returns the dtype result of the normalization (numpy.uint8 by default).
+        '''
+        # find input and output range of data
+        if isinstance(range_, (int, float, long)):
+            minOut, maxOut = 0., float(range_)
+        else:
+            minOut, maxOut = float(range_[0]), float(range_[1])
+        minIn, maxIn = image.min(), image.max()
+        ratio = (maxOut - minOut) / (maxIn - minIn)
+        
+        # remap data
+        output = (image - minIn) * ratio + minOut
+        
+        return output.astype(dtype)
     
     def run(self):
         '''
@@ -206,9 +229,11 @@ class PhotoBooth(object):
         key = None
         frame_number = 0
         
+        
         #while the key being pushed isn't the exit button
         while key != 27:
             self.frame = self.source.read()[1]
+            self.frame = self.frame.astype(numpy.float32)
             
             key = cv2.waitKey(30)
 
@@ -225,17 +250,17 @@ class PhotoBooth(object):
                     self.print_active_effects()
                         
             #apply effects and show the image
-            self.lastArrayB = self.frame
             self.apply_effects()
-            self.lastArrayA = self.frame # save the this frame as last
+            self.previous_frame = self.frame.copy() # save the this frame as last
+            self.frame = self.normalize(self.frame)
             
-            #if the key is the 'save' key
+            # Save the image
             if char == "s":
                 frame_number += 1
                 name = "img" + str(frame_number) + ".jpg"
+                name = "img-{0:05d}.jpg".format(frame_number)
                 cv2.imwrite(name,self.frame)
             
-            #show the image with effects active
             cv2.imshow("PhotoBooth", self.frame)
     
 
