@@ -8,6 +8,7 @@ import cv2
 import optparse
 import numpy
 import scipy.ndimage
+import time
 
 class PhotoBooth(object):
     def __init__(self, source=0):
@@ -152,7 +153,8 @@ class PhotoBooth(object):
         Applies frame differencing to the image.
         '''
         ### FIX THIS
-        self.frame = self.normalize(self.frame - self.previous_frame)
+        a = abs(self.frame - self.previous_frame)
+        self.frame = numpy.where(a < 20, self.frame, a)
     
     def apply_effects(self):
         '''
@@ -193,7 +195,7 @@ class PhotoBooth(object):
         Linearly remap values in input data into range (0-255, by default).  
         Returns the dtype result of the normalization (numpy.uint8 by default).
         '''
-        # find input and output range of data
+        # Find input and output range of data
         if isinstance(range_, (int, float, long)):
             minOut, maxOut = 0., float(range_)
         else:
@@ -201,10 +203,17 @@ class PhotoBooth(object):
         minIn, maxIn = image.min(), image.max()
         ratio = (maxOut - minOut) / (maxIn - minIn)
         
-        # remap data
+        # Remap data
         output = (image - minIn) * ratio + minOut
         
         return output.astype(dtype)
+    
+    def save_frame(self):
+        '''
+        '''
+        name = "img-{0:05d}.jpg".format(self.frame_number)
+        cv2.imwrite(name, self.frame)
+        self.frame_number += 1
     
     def run(self):
         '''
@@ -227,39 +236,33 @@ class PhotoBooth(object):
         esc
         '''
         key = None
-        frame_number = 0
+        self.frame_number = 0
         
-        
-        #while the key being pushed isn't the exit button
+        # While the esc key isn't pressed
         while key != 27:
             self.frame = self.source.read()[1]
             self.frame = self.frame.astype(numpy.float32)
             
             key = cv2.waitKey(30)
 
-            # Check if the key exists
+            # Add or remove the effect that was chosen
             char = chr(key) if key > 0 else None
             if self.effects.has_key(char):
-                #if the effect is not applied, queue to add it
                 if char not in self.active_effects:
+                    if char == "f":
+                        self.time_start = time.time()
                     self.add_effects(char)
                     self.print_active_effects()
-                #if the effect is applied, queue to remove it
                 else:
                     self.remove_effects(char)
                     self.print_active_effects()
                         
-            #apply effects and show the image
             self.apply_effects()
-            self.previous_frame = self.frame.copy() # save the this frame as last
             self.frame = self.normalize(self.frame)
+            self.previous_frame = self.frame.copy()
             
-            # Save the image
             if char == "s":
-                frame_number += 1
-                name = "img" + str(frame_number) + ".jpg"
-                name = "img-{0:05d}.jpg".format(frame_number)
-                cv2.imwrite(name,self.frame)
+                self.save_frame()
             
             cv2.imshow("PhotoBooth", self.frame)
     
