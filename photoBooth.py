@@ -33,7 +33,8 @@ class PhotoBooth(object):
         
         self.rotation_degree = 0
         self.gradient_sigma = 0
-        self.gaussian_sigma = 0		
+        self.gaussian_sigma = 0
+        
 
     def negate(self):
         '''
@@ -140,7 +141,8 @@ class PhotoBooth(object):
         '''
         Blends the image with the previous frame.
         '''
-        self.frame = self.frame*0.1 + (1-0.1)*self.last_array
+        #self.frame = self.frame*0.1 + (1-0.1)*self.last_array
+        pass
     
     def frame_differencing(self):
         '''
@@ -205,9 +207,9 @@ class PhotoBooth(object):
     def save_frame(self):
         '''
         '''
-        name = "img-{0:05d}.jpg".format(self.frame_number)
+        name = "img-{0:03d}.jpg".format(self.save_number)
         cv2.imwrite(name, self.frame)
-        self.frame_number += 1
+        self.save_number += 1
     
     def run(self):
         '''
@@ -215,25 +217,29 @@ class PhotoBooth(object):
         image in a window.
         
         Run the photobooth, displaying either a video or camera.
-        n negative
-        g grayscale
-        v vertical flip
-        h horizontal flip
-        a gaussian blur
-        l laplace
-        r rotate
-        m mirror
-        b alpha blend
-        c gradient magnitude
-        u unsharp mask
-        f frame differencing
-        esc
+        "a" : gaussian blur - takes extra command line argument
+        "b" : alpha blend 
+        "c" : gradient magnitude - takes extra command line argument
+        "f" : frame differencing
+        "g" : grayscale
+        "h" : flip horizontal
+        "l" : laplacian filter
+        "m" : mirror 
+        "n" : negate
+        "r" : rotate - takes extra command line argument
+        "u" : unsharp mask
+        "v" : flip vertical
+
+        "s" : save - takes extra command line argument
+
+        "q" : quit
+        ESC : quit
         '''
         key = None
-        self.frame_number = 0
+        self.save_number = 0
         
         # While the esc key isn't pressed
-        while key != 27:
+        while key != 27 and key != 113:
             self.frame = self.source.read()[1]
             self.frame = self.frame.astype(numpy.float32)
             

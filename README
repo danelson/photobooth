@@ -1,0 +1,30 @@
+A simple photo booth application.
+
+
+
+"a" : gaussian blur - takes extra command line argument
+"b" : alpha blend 
+"c" : gradient magnitude - takes extra command line argument
+"f" : frame differencing
+"g" : grayscale
+"h" : flip horizontal
+"l" : laplacian filter
+"m" : mirror 
+"n" : negate
+"r" : rotate - takes extra command line argument
+"u" : unsharp mask
+"v" : flip vertical
+
+"s" : save - takes extra command line argument
+
+"q" : quit
+ESC : quit
+
+
+
+
+
+
+
+
+
