@@ -4,11 +4,13 @@
 # Daniel Nelson
 # https://github.com/danelson
 
+
 import cv2
 import optparse
 import numpy
 import scipy.ndimage
 import time
+
 
 class PhotoBooth(object):
     def __init__(self, source=0):
@@ -42,23 +44,16 @@ class PhotoBooth(object):
         negative = new - self.frame
         self.frame = negative
     
-    def _grayscale(self, img):
-        '''
-        Takes the grayscale of the image.
-        '''
-        img.astype(float)
-        #for each color channel
-        for i in range(3):
-            img[:,:,i] = img[:,:,0]*0.3 + \
-                            img[:,:,1]*0.59 + \
-                            img[:,:,2]*0.11
-        return img
-    
     def grayscale(self):
         '''
         Takes the grayscale of the image.
         '''
-        self.frame = self._grayscale(self.frame)
+        self.frame.astype(float)
+        #for each color channel
+        for i in range(3):
+            self.frame[:,:,i] = self.frame[:,:,0]*0.3 + \
+                                self.frame[:,:,1]*0.59 + \
+                                self.frame[:,:,2]*0.11
 
     def flip_vertical(self):
         '''
@@ -104,7 +99,6 @@ class PhotoBooth(object):
         half = self.frame[:,:num_cols/2,:]
         halfFlip = numpy.fliplr(half)
         self.frame[:,num_cols/2:,:] = halfFlip
-    
     
     def unsharp_mask(self):
         '''
@@ -272,13 +266,11 @@ class PhotoBooth(object):
 #####################################################################
 
 if __name__ == "__main__":
-    # parse command line parameters
     parser = optparse.OptionParser()
     parser.add_option("-s", "--source",
                         help="0-9 for webcam or video file path",
                         default=0, type="int")
     options, remain = parser.parse_args()
 
-    # launch photo booth
     show = PhotoBooth(options.source)
     show.run()
